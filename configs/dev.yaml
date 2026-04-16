@@ -1,0 +1,7 @@
+DATABASE_URL: "postgresql://esclient_devmodr:5C9C8NCFWGXR5m!R@pg4.sweb.ru:5433/esclient_devmodr"
+HOST: "0.0.0.0"
+PORT: "7007"
+
+LOG_LEVEL: "INFO"
+LOG_FORMAT: "%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
+LOG_DATEFMT: "%Y-%m-%d %H:%M:%S"
