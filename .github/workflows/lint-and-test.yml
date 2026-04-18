@@ -1,0 +1,14 @@
+name: "lint and test"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  lint-and-test:
+    uses: esclient/tools/.github/workflows/lint-and-test-python.yml@v1.0.2
+    with:
+      python-version: "3.13.7"

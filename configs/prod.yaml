@@ -1,0 +1,7 @@
+DATABASE_URL: "{vault:moderation-service/prod#database_url}"
+HOST: "{vault:ai-validator-service/prod#host}"
+PORT: "{vault:ai-validator-service/prod#port}"
+
+LOG_LEVEL: "WARN"
+LOG_FORMAT: "%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
+LOG_DATEFMT: "%Y-%m-%d %H:%M:%S"
