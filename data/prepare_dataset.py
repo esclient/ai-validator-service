@@ -6,6 +6,7 @@ import pandas as pd
 from datasets import load_dataset
 from sklearn.model_selection import train_test_split
 from pathlib import Path
+from augment_dataset import augment_and_combine
 
 OUT      = Path("data/processed")
 DATA_DIR = Path("data/datasets")         
@@ -170,9 +171,10 @@ def run() -> None:
 
     # ── combine ───────────────────────────────────────────────────────────────
     if not frames:
-        raise RuntimeError("All loaders failed — nothing to process.")
+        raise RuntimeError("All loaders failed - nothing to process.")
 
     df = pd.concat(frames, ignore_index=True)
+    df = augment_and_combine(df)
     print(f"\nRaw combined: {len(df):,} rows")
 
     # ── quality filter ────────────────────────────────────────────────────────
