@@ -60,3 +60,6 @@ test:
       --cov-report=xml:coverage.xml
 
 prepare: format lint test
+
+prepare-dataset:
+    pdm run python data/prepare_dataset.py
