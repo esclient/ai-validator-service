@@ -136,6 +136,61 @@ def load_inappropriate_messages() -> pd.DataFrame:
  
     return base_frame(text, label, lang, "inappropriate_messages", "inappropriate")
 
+# ── 4. labled.csv (abusive True/False) ────────────────────────────────────────
+def load_labled_csv() -> pd.DataFrame:
+    path = DATA_DIR / "labled.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    raw = pd.read_csv(path)
+    print(f"    CSV columns: {list(raw.columns)}")
+    text = _text_col(raw)
+    label = raw["abusive"].map({"True": 1, "False": 0, True: 1, False: 0}).astype("int8")
+    return base_frame(text, label, "ru", "labled_csv")
+
+
+# ── 5. russian_dataset.jsonl ──────────────────────────────────────────────────
+def load_russian_jsonl() -> pd.DataFrame:
+    path = DATA_DIR / "russian_dataset.jsonl"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    raw = pd.read_json(path, lines=True)
+    print(f"    JSONL columns: {list(raw.columns)}")
+    text = _text_col(raw)
+    label = _label_from_parquet(raw)
+    return base_frame(text, label, "ru", "russian_jsonl")
+
+
+# ── 6. russian_dataset_2.tsv (parallel corpus) ────────────────────────────────
+def load_russian_tsv2() -> pd.DataFrame:
+    path = DATA_DIR / "russian_dataset_2.tsv"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    raw = pd.read_csv(path, sep="\t")
+    print(f"    TSV columns: {list(raw.columns)}")
+
+    toxic = base_frame(raw["ru_toxic_comment"],
+                       pd.Series([1]*len(raw), dtype="int8"),
+                       "ru", "russian_tsv2", "general")
+    clean = base_frame(raw["ru_neutral_comment"],
+                       pd.Series([0]*len(raw), dtype="int8"),
+                       "ru", "russian_tsv2", "general")
+    return pd.concat([toxic, clean], ignore_index=True)
+
+
+# ── 7. russian_distorted_toxicity.tsv ─────────────────────────────────────────
+def load_russian_distorted() -> pd.DataFrame:
+    path = DATA_DIR / "russian_distorted_toxicity.tsv"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    raw = pd.read_csv(path, sep="\t")
+    print(f"    TSV columns: {list(raw.columns)}")
+
+    # drop rows with missing text or label
+    raw = raw.dropna(subset=["comments", "toxicity"])
+    raw["toxicity"] = pd.to_numeric(raw["toxicity"], errors="coerce").fillna(0.0)
+    label = (raw["toxicity"] >= 0.5).astype("int8")
+    return base_frame(raw["comments"], label, "ru", "russian_distorted")
+
 # ── pipeline ──────────────────────────────────────────────────────────────────
 def run() -> None:
     print("Loading datasets...\n")
@@ -160,14 +215,22 @@ def run() -> None:
     except Exception as exc:
         print(f"  Parquet shards FAILED: {exc}")
 
-    # --- CSV ---
-    print("\n  Loading CSV:")
-    try:
-        df = load_inappropriate_messages()
-        print(f"  Inappappropriate_messages.csv: {len(df):,} rows")
-        frames.append(df)
-    except Exception as exc:
-        print(f"  CSV FAILED: {exc}")
+     # --- All local file loaders ---
+    print("\n  Loading local files:")
+    local_loaders = [
+        load_inappropriate_messages,
+        load_labled_csv,
+        load_russian_jsonl,
+        load_russian_tsv2,
+        load_russian_distorted,
+    ]
+    for loader in local_loaders:
+        try:
+            df = loader()
+            print(f"  {loader.__name__}: {len(df):,} rows")
+            frames.append(df)
+        except Exception as exc:
+            print(f"  {loader.__name__} FAILED: {exc}")
 
     # ── combine ───────────────────────────────────────────────────────────────
     if not frames:
