@@ -50,11 +50,16 @@ def base_frame(
     )
 
 
+def _to_binary_label(raw: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(raw, errors="coerce").fillna(0.0)
+    return (numeric >= 0.5).astype("int8")
+
+
 # ── 1. Civil Comments ──────────────────────────────────
 def load_civil_comments() -> pd.DataFrame:
     ds = load_dataset("civil_comments", split="train", trust_remote_code=True)
     df = ds.to_pandas()
-    label = (df["toxicity"] >= 0.5).astype("int8")
+    label = _to_binary_label(df["toxicity"])
     return base_frame(df["text"], label, "en", "civil_comments")
 
 
@@ -63,12 +68,8 @@ def _label_from_parquet(df: pd.DataFrame) -> pd.Series:
     for col in ("toxic", "toxicity", "label", "is_toxic", "target", "inappropriate"):
         if col in df.columns:
             raw = df[col]
-            if raw.dtype in ("int8", "int16", "int32", "int64", "bool"):
-                return raw.astype("int8")
-            if pd.api.types.is_float_dtype(raw):
-                return (raw >= 0.5).astype("int8")
             try:
-                return (pd.to_numeric(raw, errors="coerce").fillna(0.0) >= 0.5).astype("int8")
+                return _to_binary_label(raw)
             except Exception as exc:
                 raise KeyError(
                     f"Column '{col}' found but could not be cast to float: {exc}. "
@@ -80,7 +81,7 @@ def _label_from_parquet(df: pd.DataFrame) -> pd.Series:
 
 
 def _text_col(df: pd.DataFrame) -> pd.Series:
-    for col in ("text", "comment_text", "content", "message", "sentence"):
+    for col in ("text", "comment", "comments", "comment_text", "content", "message", "sentence"):
         if col in df.columns:
             return df[col]
     raise KeyError(
@@ -144,7 +145,7 @@ def load_labled_csv() -> pd.DataFrame:
     raw = pd.read_csv(path)
     print(f"    CSV columns: {list(raw.columns)}")
     text = _text_col(raw)
-    label = raw["abusive"].map({"True": 1, "False": 0, True: 1, False: 0}).astype("int8")
+    label = _to_binary_label(raw["abusive"].map({"True": 1, "False": 0, True: 1, False: 0}))
     return base_frame(text, label, "ru", "labled_csv")
 
 
@@ -187,9 +188,58 @@ def load_russian_distorted() -> pd.DataFrame:
 
     # drop rows with missing text or label
     raw = raw.dropna(subset=["comments", "toxicity"])
-    raw["toxicity"] = pd.to_numeric(raw["toxicity"], errors="coerce").fillna(0.0)
-    label = (raw["toxicity"] >= 0.5).astype("int8")
+    label = _to_binary_label(raw["toxicity"])
     return base_frame(raw["comments"], label, "ru", "russian_distorted")
+
+
+# ── 8. russian_comments_from_2ch_pikabu.csv ──────────────────────────────────
+def load_russian_comments_2ch_pikabu() -> pd.DataFrame:
+    path = DATA_DIR / "russian_comments_from_2ch_pikabu.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    raw = pd.read_csv(path)
+    print(f"    CSV columns: {list(raw.columns)}")
+    text = _text_col(raw)
+    label = _label_from_parquet(raw)
+    return base_frame(text, label, "ru", "russian_comments_2ch_pikabu")
+
+
+# ── 9. labeled.csv ────────────────────────────────────────────────────────────
+def load_labeled_csv() -> pd.DataFrame:
+    path = DATA_DIR / "labeled.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    raw = pd.read_csv(path)
+    print(f"    CSV columns: {list(raw.columns)}")
+    text = _text_col(raw)
+    label = _label_from_parquet(raw)
+    return base_frame(text, label, "ru", "labeled_csv")
+
+
+# ── 10. russian_dataset_3.txt (fastText labels) ──────────────────────────────
+def load_russian_dataset_3() -> pd.DataFrame:
+    path = DATA_DIR / "russian_dataset_3.txt"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+
+    rows = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(maxsplit=1)
+            if len(parts) < 2:
+                continue
+            labels_part, text = parts[0], parts[1]
+            # The file can contain multiple labels, e.g. "__label__INSULT,__label__THREAT".
+            # Any toxic marker maps to label=1, NORMAL maps to 0.
+            labels = [p.strip() for p in labels_part.split(",") if p.strip()]
+            is_toxic = any(lbl != "__label__NORMAL" for lbl in labels)
+            rows.append((text, 1 if is_toxic else 0))
+
+    raw = pd.DataFrame(rows, columns=["text", "label"])
+    return base_frame(raw["text"], _to_binary_label(raw["label"]), "ru", "russian_dataset_3_txt")
 
 # ── pipeline ──────────────────────────────────────────────────────────────────
 def run() -> None:
@@ -220,7 +270,10 @@ def run() -> None:
     local_loaders = [
         load_inappropriate_messages,
         load_labled_csv,
+        load_labeled_csv,
+        load_russian_comments_2ch_pikabu,
         load_russian_jsonl,
+        load_russian_dataset_3,
         load_russian_tsv2,
         load_russian_distorted,
     ]
