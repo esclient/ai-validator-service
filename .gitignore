@@ -207,3 +207,11 @@ marimo/_lsp/
 __marimo__/
 
 *.parquet
+
+*.csv
+*.jsonl
+*.tsv
+
+data/datasets/*
+data/processed/*
+data/raw/*

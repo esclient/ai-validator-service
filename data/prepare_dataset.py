@@ -1,16 +1,21 @@
 """
 Dataset preparation pipeline for AI-validator-service toxicity fine-tuning.
 Output schema: text (str), label (int8), lang (str), source (str), category (str)
+
+All datasets are pulled from HuggingFace: esclient/toxicity_multilanguage_dataset
 """
 import pandas as pd
 from datasets import load_dataset
+from huggingface_hub import hf_hub_download
 from sklearn.model_selection import train_test_split
 from pathlib import Path
 from augment_dataset import augment_and_combine
 
-OUT      = Path("data/processed")
-DATA_DIR = Path("data/datasets")         
+OUT = Path("data/processed")
 OUT.mkdir(parents=True, exist_ok=True)
+
+HF_REPO_ID   = "esclient/toxicity_multilanguage_dataset"
+HF_REPO_TYPE = "dataset"
 
 # Language code → ISO 639-1 tag for the parquet shards
 PARQUET_LANGS: dict[str, str] = {
@@ -32,6 +37,14 @@ PARQUET_LANGS: dict[str, str] = {
 }
 
 
+def _hf_download(filename: str) -> str:
+    return hf_hub_download(
+        repo_id=HF_REPO_ID,
+        filename=filename,
+        repo_type=HF_REPO_TYPE,
+    )
+
+
 def base_frame(
     text,
     label,
@@ -50,25 +63,17 @@ def base_frame(
     )
 
 
-# ── 1. Civil Comments ──────────────────────────────────
-def load_civil_comments() -> pd.DataFrame:
-    ds = load_dataset("civil_comments", split="train", trust_remote_code=True)
-    df = ds.to_pandas()
-    label = (df["toxicity"] >= 0.5).astype("int8")
-    return base_frame(df["text"], label, "en", "civil_comments")
+def _to_binary_label(raw: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(raw, errors="coerce").fillna(0.0)
+    return (numeric >= 0.5).astype("int8")
 
 
-# ── 2. Multilingual parquet shards ────────────────────────────────────────────
 def _label_from_parquet(df: pd.DataFrame) -> pd.Series:
     for col in ("toxic", "toxicity", "label", "is_toxic", "target", "inappropriate"):
         if col in df.columns:
             raw = df[col]
-            if raw.dtype in ("int8", "int16", "int32", "int64", "bool"):
-                return raw.astype("int8")
-            if pd.api.types.is_float_dtype(raw):
-                return (raw >= 0.5).astype("int8")
             try:
-                return (pd.to_numeric(raw, errors="coerce").fillna(0.0) >= 0.5).astype("int8")
+                return _to_binary_label(raw)
             except Exception as exc:
                 raise KeyError(
                     f"Column '{col}' found but could not be cast to float: {exc}. "
@@ -80,7 +85,7 @@ def _label_from_parquet(df: pd.DataFrame) -> pd.Series:
 
 
 def _text_col(df: pd.DataFrame) -> pd.Series:
-    for col in ("text", "comment_text", "content", "message", "sentence"):
+    for col in ("text", "comment", "comments", "comment_text", "content", "message", "sentence"):
         if col in df.columns:
             return df[col]
     raise KeyError(
@@ -88,53 +93,142 @@ def _text_col(df: pd.DataFrame) -> pd.Series:
     )
 
 
+# ── 1. Civil Comments ──────────────────────────────────────────────────────────
+def load_civil_comments() -> pd.DataFrame:
+    ds = load_dataset("civil_comments", split="train", trust_remote_code=True)
+    df = ds.to_pandas()
+    label = _to_binary_label(df["toxicity"])
+    return base_frame(df["text"], label, "en", "civil_comments")
+
+
+# ── 2. Multilingual parquet shards ────────────────────────────────────────────
 def load_parquet_shards() -> pd.DataFrame:
     frames = []
     for prefix, lang_code in PARQUET_LANGS.items():
-        pattern = f"{prefix}-00000-of-00001.parquet"
-        path = DATA_DIR / pattern
-        if not path.exists():
-            print(f"    [skip] {pattern} not found")
-            continue
+        filename = f"{prefix}-00000-of-00001.parquet"
         try:
-            raw = pd.read_parquet(path)
+            local_path = _hf_download(filename)
+            raw   = pd.read_parquet(local_path)
             text  = _text_col(raw)
             label = _label_from_parquet(raw)
-            df = base_frame(text, label, lang_code, f"parquet_{prefix}")
+            df    = base_frame(text, label, lang_code, f"parquet_{prefix}")
             frames.append(df)
-            print(f"    {pattern}: {len(df):,} rows  (lang={lang_code})")
+            print(f"    {filename}: {len(df):,} rows  (lang={lang_code})")
         except Exception as exc:
-            print(f"    [FAILED] {pattern}: {exc}")
+            print(f"    [FAILED] {filename}: {exc}")
 
     if not frames:
-        raise RuntimeError("No parquet shards loaded — check DATA_DIR path.")
+        raise RuntimeError("No parquet shards loaded — check HF repo access.")
     return pd.concat(frames, ignore_index=True)
 
 
 # ── 3. Inappappropriate_messages.csv ──────────────────────────────────────────
 def load_inappropriate_messages() -> pd.DataFrame:
-    csv_path = DATA_DIR / "Inappapropriate_messages.csv"
-    if not csv_path.exists():
-        raise FileNotFoundError(f"{csv_path} not found")
- 
-    raw = pd.read_csv(csv_path)
+    local_path = _hf_download("Inappapropriate_messages.csv")
+    raw = pd.read_csv(local_path)
     print(f"    CSV columns: {list(raw.columns)}")
- 
+
     text = _text_col(raw)
- 
+
     try:
-        label = _label_from_parquet(raw)          
+        label = _label_from_parquet(raw)
     except KeyError:
         print("    No label column in CSV — treating all rows as toxic (1)")
         label = pd.Series([1] * len(raw), dtype="int8")
- 
+
     lang_col = next((c for c in raw.columns if c.lower() in ("lang", "language", "locale")), None)
-    if lang_col:
-        lang = raw[lang_col].fillna("ru").astype(str)
-    else:
-        lang = "ru"   
- 
+    lang = raw[lang_col].fillna("ru").astype(str) if lang_col else "ru"
+
     return base_frame(text, label, lang, "inappropriate_messages", "inappropriate")
+
+
+# ── 4. labled.csv (abusive True/False) ────────────────────────────────────────
+def load_labled_csv() -> pd.DataFrame:
+    local_path = _hf_download("labled.csv")
+    raw = pd.read_csv(local_path)
+    print(f"    CSV columns: {list(raw.columns)}")
+    text  = _text_col(raw)
+    label = _to_binary_label(raw["abusive"].map({"True": 1, "False": 0, True: 1, False: 0}))
+    return base_frame(text, label, "ru", "labled_csv")
+
+
+# ── 5. russian_dataset.jsonl ──────────────────────────────────────────────────
+def load_russian_jsonl() -> pd.DataFrame:
+    local_path = _hf_download("russian_dataset.jsonl")
+    raw = pd.read_json(local_path, lines=True)
+    print(f"    JSONL columns: {list(raw.columns)}")
+    text  = _text_col(raw)
+    label = _label_from_parquet(raw)
+    return base_frame(text, label, "ru", "russian_jsonl")
+
+
+# ── 6. russian_dataset_2.tsv (parallel corpus) ────────────────────────────────
+def load_russian_tsv2() -> pd.DataFrame:
+    local_path = _hf_download("russian_dataset_2.tsv")
+    raw = pd.read_csv(local_path, sep="\t")
+    print(f"    TSV columns: {list(raw.columns)}")
+
+    toxic = base_frame(raw["ru_toxic_comment"],
+                       pd.Series([1] * len(raw), dtype="int8"),
+                       "ru", "russian_tsv2", "general")
+    clean = base_frame(raw["ru_neutral_comment"],
+                       pd.Series([0] * len(raw), dtype="int8"),
+                       "ru", "russian_tsv2", "general")
+    return pd.concat([toxic, clean], ignore_index=True)
+
+
+# ── 7. russian_distorted_toxicity.tsv ─────────────────────────────────────────
+def load_russian_distorted() -> pd.DataFrame:
+    local_path = _hf_download("russian_distorted_toxicity.tsv")
+    raw = pd.read_csv(local_path, sep="\t")
+    print(f"    TSV columns: {list(raw.columns)}")
+
+    raw   = raw.dropna(subset=["comments", "toxicity"])
+    label = _to_binary_label(raw["toxicity"])
+    return base_frame(raw["comments"], label, "ru", "russian_distorted")
+
+
+# ── 8. russian_comments_from_2ch_pikabu.csv ───────────────────────────────────
+def load_russian_comments_2ch_pikabu() -> pd.DataFrame:
+    local_path = _hf_download("russian_comments_from_2ch_pikabu.csv")
+    raw = pd.read_csv(local_path)
+    print(f"    CSV columns: {list(raw.columns)}")
+    text  = _text_col(raw)
+    label = _label_from_parquet(raw)
+    return base_frame(text, label, "ru", "russian_comments_2ch_pikabu")
+
+
+# ── 9. labeled.csv ────────────────────────────────────────────────────────────
+def load_labeled_csv() -> pd.DataFrame:
+    local_path = _hf_download("labeled.csv")
+    raw = pd.read_csv(local_path)
+    print(f"    CSV columns: {list(raw.columns)}")
+    text  = _text_col(raw)
+    label = _label_from_parquet(raw)
+    return base_frame(text, label, "ru", "labeled_csv")
+
+
+# ── 10. russian_dataset_3.txt (fastText labels) ───────────────────────────────
+def load_russian_dataset_3() -> pd.DataFrame:
+    local_path = _hf_download("russian_dataset_3.txt")
+
+    rows = []
+    with open(local_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(maxsplit=1)
+            if len(parts) < 2:
+                continue
+            labels_part, text = parts[0], parts[1]
+            labels   = [p.strip() for p in labels_part.split(",") if p.strip()]
+            is_toxic = any(lbl != "__label__NORMAL" for lbl in labels)
+            rows.append((text, 1 if is_toxic else 0))
+
+    raw = pd.DataFrame(rows, columns=["text", "label"])
+    return base_frame(raw["text"], _to_binary_label(raw["label"]), "ru", "russian_dataset_3_txt")
+
 
 # ── pipeline ──────────────────────────────────────────────────────────────────
 def run() -> None:
@@ -142,7 +236,7 @@ def run() -> None:
 
     frames: list[pd.DataFrame] = []
 
-    # --- HuggingFace datasets ---
+    # --- HuggingFace public datasets ---
     for loader in [load_civil_comments]:
         try:
             df = loader()
@@ -151,7 +245,7 @@ def run() -> None:
         except Exception as exc:
             print(f"  {loader.__name__} FAILED: {exc}")
 
-    # --- Local parquet shards ---
+    # --- Multilingual parquet shards from HF repo ---
     print("\n  Loading parquet shards:")
     try:
         df = load_parquet_shards()
@@ -160,18 +254,29 @@ def run() -> None:
     except Exception as exc:
         print(f"  Parquet shards FAILED: {exc}")
 
-    # --- CSV ---
-    print("\n  Loading CSV:")
-    try:
-        df = load_inappropriate_messages()
-        print(f"  Inappappropriate_messages.csv: {len(df):,} rows")
-        frames.append(df)
-    except Exception as exc:
-        print(f"  CSV FAILED: {exc}")
+    # --- All other files from HF repo ---
+    print("\n  Loading local files:")
+    local_loaders = [
+        load_inappropriate_messages,
+        load_labled_csv,
+        load_labeled_csv,
+        load_russian_comments_2ch_pikabu,
+        load_russian_jsonl,
+        load_russian_dataset_3,
+        load_russian_tsv2,
+        load_russian_distorted,
+    ]
+    for loader in local_loaders:
+        try:
+            df = loader()
+            print(f"  {loader.__name__}: {len(df):,} rows")
+            frames.append(df)
+        except Exception as exc:
+            print(f"  {loader.__name__} FAILED: {exc}")
 
     # ── combine ───────────────────────────────────────────────────────────────
     if not frames:
-        raise RuntimeError("All loaders failed - nothing to process.")
+        raise RuntimeError("All loaders failed — nothing to process.")
 
     df = pd.concat(frames, ignore_index=True)
     df = augment_and_combine(df)

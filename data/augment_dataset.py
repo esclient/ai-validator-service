@@ -250,6 +250,9 @@ def _target_counts(
 # ── main augmentation pipeline ────────────────────────────────────────────────
 
 def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["label"] = (pd.to_numeric(df["label"], errors="coerce").fillna(0.0) >= 0.5).astype("int8")
+
     print("\n[augment] Building toxic vocabulary...")
     vocab = build_toxic_vocabulary(df)
 
@@ -353,12 +356,16 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
 # ── integration shim ──────────────────────────────────────────────────────────
 
 def augment_and_combine(real_df: pd.DataFrame) -> pd.DataFrame:
+    real_df = real_df.copy()
+    real_df["label"] = (pd.to_numeric(real_df["label"], errors="coerce").fillna(0.0) >= 0.5).astype("int8")
+
     synth_df = build_augmented_dataset(real_df)
 
     combined = pd.concat([real_df, synth_df], ignore_index=True)
     combined["text"] = combined["text"].astype(str).str.strip()
     combined = combined[combined["text"].str.len().between(3, 512)]
     combined = combined.dropna(subset=["text", "label"])
+    combined["label"] = (pd.to_numeric(combined["label"], errors="coerce").fillna(0.0) >= 0.5).astype("int8")
 
     combined["_key"] = combined["text"].str.lower()
     combined = combined.drop_duplicates(subset="_key").drop(columns="_key")
