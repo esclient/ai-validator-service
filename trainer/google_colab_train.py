@@ -11,7 +11,6 @@ from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_sco
 from tqdm import tqdm
 import shutil
 
-# Confirm GPU + precision
 print("CUDA:", torch.cuda.is_available())
 print("Device:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")
 
@@ -75,7 +74,7 @@ class ToxicityDataset(Dataset):
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
-    # logits shape is (n, 2) — use argmax for preds, softmax[:,1] for probs
+    # logits shape is (n, 2) - use argmax for preds, softmax[:,1] for probs
     preds = np.argmax(logits, axis=-1)
     probs = torch.softmax(
         torch.tensor(logits, dtype=torch.float32), dim=-1
@@ -95,7 +94,7 @@ class WeightedTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         labels = inputs.pop("labels")          # long, shape (B,)
         outputs = model(**inputs)
-        logits = outputs.logits                # shape (B, 2) — keep both classes
+        logits = outputs.logits                # shape (B, 2) 
 
         loss = torch.nn.functional.cross_entropy(
             logits,
@@ -179,15 +178,15 @@ args = TrainingArguments(
     per_device_train_batch_size=16,
     per_device_eval_batch_size=64,
     gradient_accumulation_steps=4,
-    learning_rate=8e-7,          # lowered from 2e-5
+    learning_rate=8e-7,          
     warmup_ratio=0.06,
     weight_decay=0.01,
-    max_grad_norm=1.0,           # explicit gradient clipping
+    max_grad_norm=1.0,           
     fp16=False,
     bf16=True,
     lr_scheduler_type="cosine",
     eval_strategy="steps",
-    eval_steps=100,              # evaluate more frequently to catch issues early
+    eval_steps=100,              
     save_strategy="steps",
     save_steps=100,
     load_best_model_at_end=True,
@@ -195,7 +194,7 @@ args = TrainingArguments(
     greater_is_better=True,
     dataloader_num_workers=2,
     report_to="none",
-    logging_steps=50,            # log more frequently
+    logging_steps=50,            
 )
 
 trainer = WeightedTrainer(

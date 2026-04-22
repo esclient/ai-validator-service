@@ -213,3 +213,5 @@ __marimo__/
 *.tsv
 
 data/datasets/*
+data/processed/*
+data/raw/*
