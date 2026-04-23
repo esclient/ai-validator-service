@@ -4,16 +4,11 @@ set dotenv-load := true
 COMMON_JUST_URL := 'https://raw.githubusercontent.com/esclient/tools/refs/heads/main/python/common.just'
 LOAD_ENVS_URL := 'https://raw.githubusercontent.com/esclient/tools/refs/heads/main/load_envs.sh'
 
-COMMENT_PROTO_TAG := 'v0.0.17'
-COMMENT_PROTO_NAME := 'comment.proto'
-COMMENT_TMP_DIR := '.proto'
-SOURCE := 'commentservice'
+AIVALIDATOR_PROTO_TAG := 'v0.1.3'
+AIVALIDATOR_PROTO_NAME := 'moderation.proto'
+AIVALIDATOR_TMP_DIR := '.proto'
+SOURCE := 'aivalidatorservice'
 OUT_DIR := 'src/' + SOURCE + '/grpc'
-
-MODERATION_PROTO_TAG := 'v0.1.3'
-MODERATION_PROTO_NAME := 'moderation.proto'
-MODERATION_TMP_DIR := '.proto'
-SERVICE_NAME := 'moderation'
 
 MKDIR_TOOLS := 'mkdir -p tools'
 

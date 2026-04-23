@@ -2,44 +2,32 @@ import asyncio
 import logging
 from concurrent import futures
 
-import asyncpg
 import grpc
 from grpc_reflection.v1alpha import reflection
 
-from commentservice.clients.moderation_service import ModerationService
-from commentservice.grpc import comment_pb2, comment_pb2_grpc
-from commentservice.handler.handler import CommentHandler
-from commentservice.repository.repository import CommentRepository
-from commentservice.service.service import CommentService
-from commentservice.settings import Settings
-
+from aivalidatorservice.grpc import moderation_pb2, moderation_pb2_grpc
+from aivalidatorservice.handler.handler import ModerationHandler
+from aivalidatorservice.service.service import ModerationService
+from aivalidatorservice.settings import Settings
+from aivalidatorservice.model.loader import ModerationModel
 
 async def serve() -> None:
     settings = Settings()
     settings.configure_logging()
     logger = logging.getLogger(__name__)
 
-    db_pool = await asyncpg.create_pool(
-        dsn=settings.database_url,
-        min_size=1,
-        max_size=10,
-    )
+    model = ModerationModel(
+    model_path="./deberta-int8",
+    tokenizer_path="./deberta-int8",)
 
-    repo = CommentRepository(db_pool)
-    loop = asyncio.get_running_loop()
-
-    moderation_service = ModerationService(repo=repo, loop=loop)
-    service = CommentService(repo, moderation_service)
-    handler = CommentHandler(service)
+    service = ModerationService(model)
+    handler = ModerationHandler(service)
 
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=5))
-    comment_pb2_grpc.add_CommentServiceServicer_to_server(
-        handler,
-        server,
-    )  # type: ignore[no-untyped-call]
+    moderation_pb2_grpc.add_ModerationServiceServicer_to_server(handler, server) # type: ignore[no-untyped-call]
 
     SERVICE_NAMES = (
-        comment_pb2.DESCRIPTOR.services_by_name["CommentService"].full_name,
+        moderation_pb2.DESCRIPTOR.services_by_name["ModerationService"].full_name,
         reflection.SERVICE_NAME,
     )
     reflection.enable_server_reflection(SERVICE_NAMES, server)
@@ -47,13 +35,10 @@ async def serve() -> None:
     server.add_insecure_port(f"{settings.host}:{settings.port}")
     await server.start()
     logger.info(f"gRPC server listening on {settings.host}:{settings.port}")
-    logger.info("Kafka consumer running in background")
     await server.wait_for_termination()
-
 
 def main() -> None:
     asyncio.run(serve())
-
 
 if __name__ == "__main__":
     main()
