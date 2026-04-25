@@ -1,0 +1,39 @@
+test_sentences = [
+    # English — obvious clean
+    "Thanks for the detailed explanation, really helped me understand.",
+    "Happy birthday! Hope you have a wonderful day.",
+
+    # English — obvious toxic
+    "Kill yourself you worthless piece of garbage.",
+    "All people like you should be exterminated.",
+
+    # English — subtle toxic (no slurs, but threatening)
+    "You better watch your back, I know where you live.",
+    "Keep talking and see what happens to you.",
+
+    # English — edgy but clean (criticism, dark humor)
+    "This policy is absolutely brain-dead and whoever designed it should be fired.",
+    "The movie was torture to sit through, completely unwatchable.",
+
+    # Russian — obvious clean
+    "Спасибо за помощь, очень ценю ваше время.",       # Thank you for the help
+    "Отличная работа, продолжайте в том же духе!",     # Great work, keep it up
+
+    # Russian — obvious toxic
+    "Ты тупая мразь, убирайся отсюда.",                # You're a disgusting idiot, get out
+    "Такие люди как ты должны сдохнуть.",              # People like you should die
+
+    # Russian — subtle toxic
+    "Ну и рожа у тебя, смотреть противно.",            # What an ugly face, disgusting to look at
+    "Понаехали тут всякие, житья не дают.",            # All these migrants coming here, no peace
+
+    # Russian — edgy but clean
+    "Этот закон — полный идиотизм от начала до конца.", # This law is complete idiocy
+    "Фильм — редкостная чушь, зря потратил время.",    # The film is utter nonsense, wasted my time
+
+    # Mixed/tricky — context-dependent
+    "You're so bad at this it's actually impressive.",  # ambiguous — could be playful
+    "I want to kill this level, it's so hard.",         # gaming context, clean
+    "Он просто животное.",                              # He's just an animal — ambiguous insult
+    "This is the worst community I've ever seen.",      # harsh but not toxic
+]

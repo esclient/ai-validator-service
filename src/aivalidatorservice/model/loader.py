@@ -1,22 +1,19 @@
 from optimum.onnxruntime import ORTModelForSequenceClassification
-from transformers import DebertaV2TokenizerFast
+from transformers import AutoTokenizer
 import torch
 
 TOXICITY_THRESHOLD = 0.75
 
 class ModerationModel:
     def __init__(self, model_path: str, tokenizer_path: str):
-        self._tokenizer = DebertaV2TokenizerFast.from_pretrained(
-            tokenizer_path,
-            fix_mistral_regex=True,
-        )
+        self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         self._model = ORTModelForSequenceClassification.from_pretrained(
             model_path,
             file_name="model_quantized.onnx",
         )
         self._run("warmup")
 
-    def _run(self, text: str) -> bool:
+    def _run(self, text: str) -> float:
         inputs = self._tokenizer(
             text,
             return_tensors="pt",

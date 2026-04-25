@@ -17,8 +17,9 @@ async def serve() -> None:
     logger = logging.getLogger(__name__)
 
     model = ModerationModel(
-    model_path="./deberta-int8",
-    tokenizer_path="./deberta-int8",)
+        model_path="./models/deberta-qat-int8-v2",
+        tokenizer_path="microsoft/deberta-v3-small",
+    )
 
     service = ModerationService(model)
     handler = ModerationHandler(service)

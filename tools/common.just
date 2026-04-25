@@ -47,3 +47,12 @@ prepare: format lint test
 
 prepare-dataset:
     pdm run python data/prepare_dataset.py
+
+run-qat-training:
+    pdm run python trainer/train_qat.py
+
+run-exporter:
+    pdm run python trainer/onnx_exporter.py
+
+quantize:
+    pdm run python trainer/quantizer.py

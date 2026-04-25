@@ -4,6 +4,8 @@ Output schema: text (str), label (int8), lang (str), source (str), category (str
 
 All datasets are pulled from HuggingFace: esclient/toxicity_multilanguage_dataset
 """
+from pyexpat import model
+
 import pandas as pd
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
@@ -61,7 +63,6 @@ def base_frame(
             "category": category,
         }
     )
-
 
 def _to_binary_label(raw: pd.Series) -> pd.Series:
     numeric = pd.to_numeric(raw, errors="coerce").fillna(0.0)
@@ -229,14 +230,11 @@ def load_russian_dataset_3() -> pd.DataFrame:
     raw = pd.DataFrame(rows, columns=["text", "label"])
     return base_frame(raw["text"], _to_binary_label(raw["label"]), "ru", "russian_dataset_3_txt")
 
-
-# ── pipeline ──────────────────────────────────────────────────────────────────
 def run() -> None:
     print("Loading datasets...\n")
 
     frames: list[pd.DataFrame] = []
 
-    # --- HuggingFace public datasets ---
     for loader in [load_civil_comments]:
         try:
             df = loader()
@@ -245,7 +243,6 @@ def run() -> None:
         except Exception as exc:
             print(f"  {loader.__name__} FAILED: {exc}")
 
-    # --- Multilingual parquet shards from HF repo ---
     print("\n  Loading parquet shards:")
     try:
         df = load_parquet_shards()
@@ -254,7 +251,6 @@ def run() -> None:
     except Exception as exc:
         print(f"  Parquet shards FAILED: {exc}")
 
-    # --- All other files from HF repo ---
     print("\n  Loading local files:")
     local_loaders = [
         load_inappropriate_messages,
@@ -274,7 +270,6 @@ def run() -> None:
         except Exception as exc:
             print(f"  {loader.__name__} FAILED: {exc}")
 
-    # ── combine ───────────────────────────────────────────────────────────────
     if not frames:
         raise RuntimeError("All loaders failed — nothing to process.")
 
@@ -288,7 +283,6 @@ def run() -> None:
     df = df.dropna(subset=["text", "label"])
     df["label"] = df["label"].astype("int8")
 
-    # ── deduplicate ───────────────────────────────────────────────────────────
     df["_key"] = df["text"].str.lower()
     df = df.drop_duplicates(subset="_key").drop(columns="_key")
     print(f"After dedup + filter: {len(df):,} rows")

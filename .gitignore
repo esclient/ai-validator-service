@@ -219,3 +219,5 @@ data/raw/*
 patched-tokenizer/*
 deberta-int8/*
 deberta-onnx/*
+
+models/*
