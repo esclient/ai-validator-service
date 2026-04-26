@@ -29,30 +29,23 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# ── constants ────────────────────────────────────────────────────────────────
+MAX_SYNTHETIC_RATIO = 0.40   
 
-MAX_SYNTHETIC_RATIO = 0.40   # synthetic rows never exceed 40% of final dataset
-
-# Priority weights for partial-concat boundary removal
 P_TOXIC_BOUNDARY    = 0.85   # space between toxic word and any neighbour
 P_ADJACENT_BOUNDARY = 0.50   # space one hop away from a toxic word
 P_RANDOM_BOUNDARY   = 0.15   # all other word boundaries
 
-# Context-mix label thresholds
 TOXIC_RATIO_HIGH = 0.70
 TOXIC_RATIO_LOW  = 0.30
 
-# How many toxic words to extract via TF-IDF
 TOP_N_TOXIC_WORDS = 300
 
-# Seed for reproducibility
 SEED = 42
 
 random.seed(SEED)
 np.random.seed(SEED)
 
 
-# ── toxic vocabulary bootstrap ────────────────────────────────────────────────
 
 def build_toxic_vocabulary(df: pd.DataFrame, top_n: int = TOP_N_TOXIC_WORDS) -> set[str]:
     """
@@ -93,16 +86,11 @@ def build_toxic_vocabulary(df: pd.DataFrame, top_n: int = TOP_N_TOXIC_WORDS) -> 
     print(f"  [vocab] Bootstrapped {len(toxic_vocab)} toxic indicator words via TF-IDF")
     return toxic_vocab
 
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
 def _tokenize(text: str) -> list[str]:
     return text.split()
 
-
 def _is_toxic_word(word: str, vocab: set[str]) -> bool:
     return word.lower().strip(".,!?;:\"'") in vocab
-
 
 def _classify_boundaries(tokens: list[str], vocab: set[str]) -> list[str]:
     n = len(tokens)
@@ -137,7 +125,6 @@ def _remove_space(boundary_class: str) -> bool:
     return random.random() < p
 
 
-# ── augmentation functions ─────────────────────────────────────────────────────
 
 def aug_full_concat(text: str, **_) -> str:
     return "".join(_tokenize(text))
@@ -185,8 +172,6 @@ def aug_crosslang_concat(
     return sep.join(parts)
 
 
-# ── context mix label logic ───────────────────────────────────────────────────
-
 def _context_mix_label_and_category(toxic_ratio: float) -> tuple[int, str]:
     if toxic_ratio >= TOXIC_RATIO_HIGH:
         return 1, "concatenation"
@@ -216,7 +201,6 @@ def _build_context_mix_row(
     return text, label, category
 
 
-# ── volume balancer ───────────────────────────────────────────────────────────
 
 def _target_counts(
     real_df: pd.DataFrame,
@@ -247,7 +231,6 @@ def _target_counts(
     return targets
 
 
-# ── main augmentation pipeline ────────────────────────────────────────────────
 
 def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -268,7 +251,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
 
     filler_pool = clean_texts  
 
-    # ── figure out how many rows we need per bucket ───────────────────────────
     buckets = [
         ("concatenation",    0),
         ("concatenation",    1),
@@ -295,7 +277,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
                 "category": category,
             })
 
-    # ── 1. synthetic_concat ───────────────────────────────────────────────────
     cat_lbl = ("concatenation", 1)
     n = targets.get(cat_lbl, 0)
     print(f"[augment] synthetic_concat: generating {n} rows")
@@ -304,7 +285,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
         text = aug_full_concat(rec["text"])
         add_row(text, 1, rec["lang"], "synthetic_concat", "concatenation")
 
-    # ── 2. synthetic_partial_concat ───────────────────────────────────────────
     n_toxic = targets.get(("concatenation", 1), 0)
     n_clean = targets.get(("concatenation", 0), 0)
     print(f"[augment] synthetic_partial_concat: {n_toxic} toxic, {n_clean} clean")
@@ -317,7 +297,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
         text = aug_partial_concat(rec["text"], vocab=vocab)
         add_row(text, 0, rec["lang"], "synthetic_partial_concat", "concatenation")
 
-    # ── 3. synthetic_context_filler ───────────────────────────────────────────
     cat_lbl = ("context", 1)
     n = targets.get(cat_lbl, 0)
     print(f"[augment] synthetic_context_filler: generating {n} rows")
@@ -325,7 +304,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
         text = aug_context_filler(rec["text"], filler_pool=filler_pool, n_fillers=random.randint(1, 2))
         add_row(text, 1, rec["lang"], "synthetic_context_filler", "context")
 
-    # ── 4. synthetic_context_mix ──────────────────────────────────────────────
     n_mix = targets.get(("context", 0), 0) + targets.get(("context_ambiguous", 0), 0)
     print(f"[augment] synthetic_context_mix: generating ~{n_mix} rows")
     toxic_recs = random.choices(toxic_df.to_dict("records"), k=n_mix)
@@ -334,7 +312,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
         text, label, category = _build_context_mix_row(t_rec["text"], c_rec["text"])
         add_row(text, label, t_rec["lang"], "synthetic_context_mix", category)
 
-    # ── 5. synthetic_crosslang ────────────────────────────────────────────────
     n = targets.get(("concatenation", 1), 0) // 2  # share budget with concat
     print(f"[augment] synthetic_crosslang: generating {n} rows")
     for rec in random.choices(toxic_df.to_dict("records"), k=n):
@@ -353,7 +330,6 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
     return synth_df
 
 
-# ── integration shim ──────────────────────────────────────────────────────────
 
 def augment_and_combine(real_df: pd.DataFrame) -> pd.DataFrame:
     real_df = real_df.copy()

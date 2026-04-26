@@ -215,3 +215,9 @@ __marimo__/
 data/datasets/*
 data/processed/*
 data/raw/*
+
+patched-tokenizer/*
+deberta-int8/*
+deberta-onnx/*
+
+models/*
