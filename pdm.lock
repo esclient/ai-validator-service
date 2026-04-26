@@ -5,7 +5,7 @@
 groups = ["default", "dev", "quantize"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:1d063bc87338415c1464de94251e8dbdd67ccc9e7058c9c1944e6afb2b42843c"
+content_hash = "sha256:091bbe537cc7f8d027999c2849e85334761b181bb6ec234533139f03b92e8945"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
