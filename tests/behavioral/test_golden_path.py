@@ -1,5 +1,6 @@
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_high_logit_returns_true(toxic_service):
     result = await toxic_service.moderate("arbitrary text")
@@ -24,4 +25,3 @@ async def test_low_logit_returns_false(clean_service):
 async def test_crash_safety_inputs_return_boolean(clean_service, text):
     result = await clean_service.moderate(text)
     assert isinstance(result, bool)
-    
