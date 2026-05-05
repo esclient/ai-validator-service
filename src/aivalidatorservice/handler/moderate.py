@@ -1,8 +1,8 @@
 import grpc
 
 from aivalidatorservice.grpc import moderation_pb2
+from aivalidatorservice.logger.custom_logger import get_logger
 from aivalidatorservice.service.service import ModerationService
-from logger.custom_logger import get_logger
 
 log = get_logger(__name__)
 

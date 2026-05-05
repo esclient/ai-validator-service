@@ -2,6 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from _pytest.monkeypatch import MonkeyPatch
+from transformers import PreTrainedTokenizerBase
 
 from aivalidatorservice.model import loader
 from aivalidatorservice.model.loader import ModerationModel
@@ -26,12 +28,13 @@ def make_fake_tokenizer(max_length: int = 128) -> MagicMock:
 
 
 @pytest.fixture(scope="session")
-def real_tokenizer():
-    return loader.AutoTokenizer.from_pretrained("microsoft/deberta-v3-small")
+def real_tokenizer() -> PreTrainedTokenizerBase:
+    model_name = "microsoft/deberta-v3-small"
+    return loader.AutoTokenizer.from_pretrained(model_name)  # type: ignore[no-untyped-call, no-any-return]
 
 
 @pytest.fixture
-def toxic_service(monkeypatch):
+def toxic_service(monkeypatch: MonkeyPatch) -> ModerationService:
     monkeypatch.setattr(
         loader.AutoTokenizer,
         "from_pretrained",
@@ -49,7 +52,7 @@ def toxic_service(monkeypatch):
 
 
 @pytest.fixture
-def clean_service(monkeypatch):
+def clean_service(monkeypatch: MonkeyPatch) -> ModerationService:
     monkeypatch.setattr(
         loader.AutoTokenizer,
         "from_pretrained",

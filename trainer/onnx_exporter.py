@@ -5,7 +5,7 @@ from optimum.exporters.onnx import main_export
 from optimum.onnxruntime import ORTModelForSequenceClassification
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from logger.custom_logger import get_logger
+from aivalidatorservice.logger.custom_logger import get_logger
 
 DATA_DIR = Path("data/processed")
 OUT_DIR = Path("models/deberta-qat")
@@ -20,7 +20,7 @@ MODEL_ID = "esclient/deberta-toxicity-model"
 log = get_logger(__name__)
 
 log.info(f"Loading {MODEL_ID}...")
-tokenizer = AutoTokenizer.from_pretrained(BASE_ID)
+tokenizer = AutoTokenizer.from_pretrained(BASE_ID)  # type: ignore[no-untyped-call]
 model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_ID, num_labels=2
 )

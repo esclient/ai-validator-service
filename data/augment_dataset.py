@@ -22,12 +22,13 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from logger.custom_logger import get_logger
+from aivalidatorservice.logger.custom_logger import get_logger
 
 MAX_SYNTHETIC_RATIO = 0.40
 
@@ -132,11 +133,11 @@ def _remove_space(boundary_class: str) -> bool:
     return random.random() < p
 
 
-def aug_full_concat(text: str, **_) -> str:
+def aug_full_concat(text: str, **_: Any) -> str:
     return "".join(_tokenize(text))
 
 
-def aug_partial_concat(text: str, vocab: set[str], **_) -> str:
+def aug_partial_concat(text: str, vocab: set[str], **_: Any) -> str:
     tokens = _tokenize(text)
     if len(tokens) <= 1:
         return text
@@ -153,7 +154,7 @@ def aug_context_filler(
     text: str,
     filler_pool: list[str],
     n_fillers: int = 1,
-    **_,
+    **_: Any,
 ) -> str:
     fillers = random.sample(filler_pool, min(n_fillers, len(filler_pool)))
     parts = [*fillers, text]
@@ -165,7 +166,7 @@ def aug_crosslang_concat(
     text: str,
     lang: str,
     lang_pool: dict[str, list[str]],
-    **_,
+    **_: Any,
 ) -> str | None:
     other_langs = [
         lang_code
@@ -275,9 +276,11 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
     targets = _target_counts(df, buckets)
     log.debug(f"[augment] Synthetic targets per bucket: {dict(targets)}")
 
-    rows: list[dict] = []
+    rows: list[dict[str, object]] = []
 
-    def add_row(text, label, lang, source, category):
+    def add_row(
+        text: object, label: int, lang: str, source: str, category: str
+    ) -> None:
         text = str(text).strip()
         if 3 <= len(text) <= 512:
             rows.append(
@@ -342,11 +345,13 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
     n = targets.get(("concatenation", 1), 0) // 2  # share budget with concat
     log.info(f"[augment] synthetic_crosslang: generating {n} rows")
     for rec in random.choices(toxic_df.to_dict("records"), k=n):
-        text = aug_crosslang_concat(
+        cross_text = aug_crosslang_concat(
             rec["text"], lang=rec["lang"], lang_pool=lang_pool
         )
-        if text:
-            add_row(text, 1, "mixed", "synthetic_crosslang", "concatenation")
+        if cross_text:
+            add_row(
+                cross_text, 1, "mixed", "synthetic_crosslang", "concatenation"
+            )
 
     synth_df = pd.DataFrame(rows)
     if synth_df.empty:

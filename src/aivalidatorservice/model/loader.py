@@ -2,11 +2,16 @@ import torch
 from optimum.onnxruntime import ORTModelForSequenceClassification
 from transformers import AutoTokenizer
 
-from logger.custom_logger import get_logger
+from aivalidatorservice.logger.custom_logger import get_logger
 
 TOXICITY_THRESHOLD = 0.75
 
 log = get_logger(__name__)
+__all__ = [
+    "AutoTokenizer",
+    "ModerationModel",
+    "ORTModelForSequenceClassification",
+]
 
 
 class ModerationModel:
@@ -14,7 +19,7 @@ class ModerationModel:
         log.info(
             f"Initializing ModerationModel model_path={model_path} tokenizer_path={tokenizer_path}"
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)  # type: ignore[no-untyped-call]
         self._model = ORTModelForSequenceClassification.from_pretrained(
             model_path,
             file_name="model_quantized.onnx",

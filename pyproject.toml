@@ -78,6 +78,7 @@ ignore = [
 [tool.mypy]
 python_version = "3.13"
 strict = true
+ignore_missing_imports = true
 exclude = [
     'src(?:[/\\])aivalidatorservice(?:[/\\])grpc',
     'trainer(?:[/\\])google_colab_train\.py',
@@ -93,7 +94,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 show_error_codes = true
 explicit_package_bases = true
-mypy_path = ["src"]
+mypy_path = ["src", "."]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]

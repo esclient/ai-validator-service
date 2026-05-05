@@ -5,6 +5,7 @@ Output schema: text (str), label (int8), lang (str), source (str), category (str
 All datasets are pulled from HuggingFace: esclient/toxicity_multilanguage_dataset
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -13,7 +14,7 @@ from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 from sklearn.model_selection import train_test_split
 
-from logger.custom_logger import get_logger
+from aivalidatorservice.logger.custom_logger import get_logger
 
 OUT = Path("data/processed")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -51,8 +52,8 @@ def _hf_download(filename: str) -> str:
 
 
 def base_frame(
-    text,
-    label,
+    text: Sequence[object] | pd.Series,
+    label: Sequence[object] | pd.Series,
     lang: str,
     source: str,
     category: str = "general",

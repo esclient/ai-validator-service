@@ -3,7 +3,7 @@ from pathlib import Path
 from optimum.onnxruntime import ORTQuantizer
 from optimum.onnxruntime.configuration import AutoQuantizationConfig
 
-from logger.custom_logger import get_logger
+from aivalidatorservice.logger.custom_logger import get_logger
 
 ONNX_DIR = Path("models/deberta-qat-onnx-v2")
 INT8_DIR = Path("models/deberta-qat-int8-v2")

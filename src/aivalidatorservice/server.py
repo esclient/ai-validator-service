@@ -6,10 +6,10 @@ from grpc_reflection.v1alpha import reflection
 
 from aivalidatorservice.grpc import moderation_pb2, moderation_pb2_grpc
 from aivalidatorservice.handler.handler import ModerationHandler
+from aivalidatorservice.logger.custom_logger import get_logger
 from aivalidatorservice.model.loader import ModerationModel
 from aivalidatorservice.service.service import ModerationService
 from aivalidatorservice.settings import Settings
-from custom_logger import get_logger
 
 
 async def serve() -> None:

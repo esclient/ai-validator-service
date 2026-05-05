@@ -1,5 +1,5 @@
+from aivalidatorservice.logger.custom_logger import get_logger
 from aivalidatorservice.model.loader import ModerationModel
-from custom_logger import get_logger
 
 log = get_logger(__name__)
 

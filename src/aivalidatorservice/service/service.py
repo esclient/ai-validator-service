@@ -1,8 +1,8 @@
 import asyncio
 
+from aivalidatorservice.logger.custom_logger import get_logger
 from aivalidatorservice.model.loader import ModerationModel
 from aivalidatorservice.service.moderate import moderate as _moderate
-from custom_logger import get_logger
 
 log = get_logger(__name__)
 

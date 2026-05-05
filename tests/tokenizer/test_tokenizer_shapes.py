@@ -1,4 +1,9 @@
-def test_tokenizer_truncates_to_max_length_128(real_tokenizer):
+from transformers import PreTrainedTokenizerBase
+
+
+def test_tokenizer_truncates_to_max_length_128(
+    real_tokenizer: PreTrainedTokenizerBase,
+) -> None:
     out = real_tokenizer(
         "token " * 400, return_tensors="pt", max_length=128, truncation=True
     )

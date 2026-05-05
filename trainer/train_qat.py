@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -17,10 +18,12 @@ from transformers import (
     EarlyStoppingCallback,
     Trainer,
     TrainerCallback,
+    TrainerControl,
+    TrainerState,
     TrainingArguments,
 )
 
-from logger.custom_logger import get_logger
+from aivalidatorservice.logger.custom_logger import get_logger
 
 log = get_logger(__name__)
 
@@ -49,16 +52,30 @@ MAX_LEN = 128
 
 
 class SaveBestCallback(TrainerCallback):
-    def __init__(self, save_path, tokenizer, f1_weight=0.5, auc_weight=0.5):
+    def __init__(
+        self,
+        save_path: Path,
+        tokenizer: Any,
+        f1_weight: float = 0.5,
+        auc_weight: float = 0.5,
+    ) -> None:
         self.save_path = save_path
         self.tokenizer = tokenizer
         self.f1_weight = f1_weight
         self.auc_weight = auc_weight
         self.best_score = 0.0
 
-    def on_evaluate(self, _args, _state, _control, metrics=None, **kwargs):
-        current_f1 = metrics.get("eval_f1", 0.0)
-        current_auc = metrics.get("eval_roc_auc", 0.0)
+    def on_evaluate(
+        self,
+        _args: TrainingArguments,
+        _state: TrainerState,
+        _control: TrainerControl,
+        metrics: dict[str, float] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        eval_metrics = metrics or {}
+        current_f1 = eval_metrics.get("eval_f1", 0.0)
+        current_auc = eval_metrics.get("eval_roc_auc", 0.0)
         combined = (self.f1_weight * current_f1) + (
             self.auc_weight * current_auc
         )
@@ -74,8 +91,14 @@ class SaveBestCallback(TrainerCallback):
             log.info(f"New best {combined:.4f} saved -> {self.save_path}")
 
 
-class ToxicityDataset(Dataset):
-    def __init__(self, df, tokenizer, max_len, name="dataset"):
+class ToxicityDataset(Dataset[dict[str, torch.Tensor]]):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        tokenizer: Any,
+        max_len: int,
+        name: str = "dataset",
+    ) -> None:
         log.info(f"Tokenizing {name} ({len(df):,} samples)...")
         enc = tokenizer(
             df["text"].tolist(),
@@ -89,10 +112,10 @@ class ToxicityDataset(Dataset):
         self.labels = torch.tensor(df["label"].values, dtype=torch.long)
         log.info(f"Done tokenizing {name}!")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.labels)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         return {
             "input_ids": self.input_ids[idx],
             "attention_mask": self.attention_mask[idx],
@@ -100,7 +123,11 @@ class ToxicityDataset(Dataset):
         }
 
 
-def compute_metrics(eval_pred):
+def compute_metrics(
+    eval_pred: tuple[
+        np.ndarray[Any, np.dtype[Any]], np.ndarray[Any, np.dtype[Any]]
+    ],
+) -> dict[str, float]:
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
     probs = torch.softmax(torch.tensor(logits, dtype=torch.float32), dim=-1)[
@@ -115,11 +142,20 @@ def compute_metrics(eval_pred):
 
 
 class WeightedTrainer(Trainer):
-    def __init__(self, class_weights, *args, **kwargs):
+    def __init__(
+        self, class_weights: torch.Tensor, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.class_weights = class_weights
 
-    def compute_loss(self, model, inputs, return_outputs=False, **_kwargs):
+    def compute_loss(
+        self,
+        model: torch.nn.Module,
+        inputs: dict[str, torch.Tensor | Any],
+        return_outputs: bool = False,
+        num_items_in_batch: torch.Tensor | None = None,
+    ) -> Any:
+        del num_items_in_batch
         labels = inputs.pop("labels")
         outputs = model(**inputs)
         loss = torch.nn.functional.cross_entropy(
@@ -135,7 +171,9 @@ train_df = pd.read_parquet(DATA_DIR / "train.parquet")
 val_df = pd.read_parquet(DATA_DIR / "val.parquet")
 
 
-def stratified_sample(df, n, label_col="label", seed=42):
+def stratified_sample(
+    df: pd.DataFrame, n: int, label_col: str = "label", seed: int = 42
+) -> pd.DataFrame:
     return (
         df.groupby(label_col, group_keys=False)
         .apply(
@@ -150,8 +188,12 @@ def stratified_sample(df, n, label_col="label", seed=42):
 
 
 def language_balanced_sample(
-    df, en_cap=300_000, ru_cap=300_000, other_per_lang=8_000, seed=42
-):
+    df: pd.DataFrame,
+    en_cap: int = 300_000,
+    ru_cap: int = 300_000,
+    other_per_lang: int = 8_000,
+    seed: int = 42,
+) -> pd.DataFrame:
     parts = []
     for lang, group in df.groupby("lang"):
         cap = {"en": en_cap, "ru": ru_cap, "mixed": 20_000}.get(
@@ -197,7 +239,7 @@ log.info(
 )
 
 log.info(f"Loading {MODEL_ID}...")
-tokenizer = AutoTokenizer.from_pretrained(BASE_ID)
+tokenizer = AutoTokenizer.from_pretrained(BASE_ID)  # type: ignore[no-untyped-call]
 model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_ID, num_labels=2
 )

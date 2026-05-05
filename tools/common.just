@@ -39,7 +39,9 @@ lint:
     pdm run mypy --strict .
 
 test:
-    pdm run pytest tests/
+    pdm run pytest \
+        --cov=src/{{SOURCE}} \
+        --cov-report=xml:coverage.xml 
 
 prepare: format lint test
 
