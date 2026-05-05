@@ -1,3 +1,5 @@
+from typing import Any
+
 import grpc
 
 from aivalidatorservice.grpc import moderation_pb2
@@ -10,7 +12,7 @@ log = get_logger(__name__)
 async def moderate(
     service: ModerationService,
     request: moderation_pb2.ModerateObjectRequest,
-    _context: grpc.ServicerContext,
+    _context: grpc.aio.ServicerContext[Any, Any],
 ) -> moderation_pb2.ModerateObjectResponse:
     try:
         is_toxic = await service.moderate(request.text)

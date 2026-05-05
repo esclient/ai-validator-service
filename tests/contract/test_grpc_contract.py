@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from grpc.aio import ServicerContext
@@ -19,7 +19,7 @@ async def test_grpc_contract_toxic_input_returns_expected_response(
     )
     handler = ModerationHandler(toxic_service)
     response = await handler.ModerateObject(
-        request, context=cast(ServicerContext, None)
+        request, context=cast(ServicerContext[Any, Any], None)
     )
     assert isinstance(response, moderation_pb2.ModerateObjectResponse)
     assert response.success is True
