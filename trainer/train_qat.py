@@ -72,7 +72,7 @@ class SaveBestCallback(TrainerCallback):
         _control: TrainerControl,
         metrics: dict[str, float] | None = None,
         **kwargs: Any,
-    ) -> None: # type: ignore[override]
+    ) -> None:  # type: ignore[override]
         eval_metrics = metrics or {}
         current_f1 = eval_metrics.get("eval_f1", 0.0)
         current_auc = eval_metrics.get("eval_roc_auc", 0.0)
