@@ -65,14 +65,14 @@ class SaveBestCallback(TrainerCallback):
         self.auc_weight = auc_weight
         self.best_score = 0.0
 
-    def on_evaluate( # type: ignore[override]
+    def on_evaluate(  # type: ignore[override]
         self,
         _args: TrainingArguments,
         _state: TrainerState,
         _control: TrainerControl,
         metrics: dict[str, float] | None = None,
         **kwargs: Any,
-    ) -> None:  
+    ) -> None:
         eval_metrics = metrics or {}
         current_f1 = eval_metrics.get("eval_f1", 0.0)
         current_auc = eval_metrics.get("eval_roc_auc", 0.0)
