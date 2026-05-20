@@ -1,7 +1,7 @@
-import logging
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from aivalidatorservice.logger.custom_logger import configure_logger
 
 
 class Settings(BaseSettings):
@@ -18,8 +18,4 @@ class Settings(BaseSettings):
     log_datefmt: str = Field(validation_alias="LOG_DATEFMT")
 
     def configure_logging(self) -> None:
-        logging.basicConfig(
-            level=self.log_level,
-            format=self.log_format,
-            datefmt=self.log_datefmt,
-        )
+        configure_logger(self)

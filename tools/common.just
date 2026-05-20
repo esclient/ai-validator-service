@@ -27,21 +27,21 @@ gen-stubs-moderation: fetch-proto
 update-moderation: gen-stubs-moderation clean
 
 format:
-    black .
-    isort .
-    ruff check . --fix
+    pdm run black .
+    pdm run isort .
+    pdm run ruff check . --fix
 
 lint:
-    black --check .
-    isort . --check --diff
-    flake8 .
-    ruff check .
-    mypy --strict .
+    pdm run black --check .
+    pdm run isort . --check --diff
+    pdm run flake8 .
+    pdm run ruff check .
+    pdm run mypy --strict .
 
 test:
-    pytest \
-      --cov=src/{{SOURCE}} \
-      --cov-report=xml:coverage.xml
+    pdm run pytest \
+        --cov=src/{{SOURCE}} \
+        --cov-report=xml:coverage.xml 
 
 prepare: format lint test
 

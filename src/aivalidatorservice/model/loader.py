@@ -1,12 +1,25 @@
+import torch
 from optimum.onnxruntime import ORTModelForSequenceClassification
 from transformers import AutoTokenizer
-import torch
+
+from aivalidatorservice.logger.custom_logger import get_logger
 
 TOXICITY_THRESHOLD = 0.75
 
+log = get_logger(__name__)
+__all__ = [
+    "AutoTokenizer",
+    "ModerationModel",
+    "ORTModelForSequenceClassification",
+]
+
+
 class ModerationModel:
     def __init__(self, model_path: str, tokenizer_path: str):
-        self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        log.info(
+            f"Initializing ModerationModel model_path={model_path} tokenizer_path={tokenizer_path}"
+        )
+        self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)  # type: ignore[no-untyped-call]
         self._model = ORTModelForSequenceClassification.from_pretrained(
             model_path,
             file_name="model_quantized.onnx",
@@ -22,10 +35,12 @@ class ModerationModel:
         )
         outputs = self._model(**inputs)
         probabilities = torch.softmax(outputs.logits, dim=-1)
-        toxic_score = probabilities[0][1].item()  
+        toxic_score = probabilities[0][1].item()
         return toxic_score
 
     def predict(self, text: str) -> bool:
         score = self._run(text)
-        print(f"[debug] toxic_score={score:.4f} threshold={TOXICITY_THRESHOLD}")
+        log.debug(
+            f"Prediction toxic_score={score:.4f} threshold={TOXICITY_THRESHOLD}"
+        )
         return score > TOXICITY_THRESHOLD

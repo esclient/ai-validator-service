@@ -1,11 +1,27 @@
+from typing import Any
+
 import grpc
+
 from aivalidatorservice.grpc import moderation_pb2
+from aivalidatorservice.logger.custom_logger import get_logger
 from aivalidatorservice.service.service import ModerationService
 
-async def Moderate(
+log = get_logger(__name__)
+
+
+async def moderate(
     service: ModerationService,
     request: moderation_pb2.ModerateObjectRequest,
-    context: grpc.ServicerContext,
+    _context: grpc.aio.ServicerContext[Any, Any],
 ) -> moderation_pb2.ModerateObjectResponse:
-    is_toxic = await service.moderate(request.text)
-    return moderation_pb2.ModerateObjectResponse(success=is_toxic)
+    try:
+        is_toxic = await service.moderate(request.text)
+    except Exception as exc:
+        log.error(f"Moderation request failed: {exc}")
+        raise
+
+    response = moderation_pb2.ModerateObjectResponse(success=is_toxic)
+    log.debug(
+        f"Responding ModerateObject id={request.id} success={response.success}"
+    )
+    return response
