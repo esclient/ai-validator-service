@@ -74,6 +74,13 @@ def _to_binary_label(raw: pd.Series) -> pd.Series:
     return (numeric >= 0.5).astype("int8")
 
 
+def _to_ternary_label(raw: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(raw, errors="coerce").fillna(0.0)
+    return pd.cut(
+        numeric, bins=[-0.01, 0.3, 0.7, 1.01], labels=[0, 1, 2]
+    ).astype("int8")
+
+
 def _label_from_parquet(df: pd.DataFrame) -> pd.Series:
     for col in (
         "toxic",
@@ -118,7 +125,7 @@ def _text_col(df: pd.DataFrame) -> pd.Series:
 def load_civil_comments() -> pd.DataFrame:
     ds = load_dataset("civil_comments", split="train", trust_remote_code=True)
     df = ds.to_pandas()
-    label = _to_binary_label(df["toxicity"])
+    label = _to_ternary_label(df["toxicity"])
     return base_frame(df["text"], label, "en", "civil_comments")
 
 

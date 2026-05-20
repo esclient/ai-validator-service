@@ -56,7 +56,7 @@ def build_toxic_vocabulary(
     discrimination between label=1 and label=0 texts.
     Words that score highest in toxic docs relative to clean docs are selected.
     """
-    toxic_texts = df[df["label"] == 1]["text"].astype(str).tolist()
+    toxic_texts = df[df["label"] >= 1]["text"].astype(str).tolist()
     clean_texts = df[df["label"] == 0]["text"].astype(str).tolist()
 
     if not toxic_texts or not clean_texts:
@@ -185,11 +185,11 @@ def aug_crosslang_concat(
 
 def _context_mix_label_and_category(toxic_ratio: float) -> tuple[int, str]:
     if toxic_ratio >= TOXIC_RATIO_HIGH:
-        return 1, "concatenation"
+        return 2, "concatenation"
     elif toxic_ratio <= TOXIC_RATIO_LOW:
         return 0, "context"
     else:
-        return 0, "context_ambiguous"
+        return 1, "context_ambiguous"
 
 
 def _build_context_mix_row(
@@ -246,13 +246,16 @@ def _target_counts(
 def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["label"] = (
-        pd.to_numeric(df["label"], errors="coerce").fillna(0.0) >= 0.5
-    ).astype("int8")
+        pd.to_numeric(df["label"], errors="coerce")
+        .fillna(0.0)
+        .clip(0, 2)
+        .astype("int8")
+    )
 
     log.info("[augment] Building toxic vocabulary...")
     vocab = build_toxic_vocabulary(df)
 
-    toxic_df = df[df["label"] == 1].copy()
+    toxic_df = df[df["label"] >= 1].copy()
     clean_df = df[df["label"] == 0].copy()
 
     clean_texts = clean_df["text"].astype(str).tolist()
@@ -266,12 +269,13 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
     buckets = [
         ("concatenation", 0),
         ("concatenation", 1),
+        ("concatenation", 2),
         ("context", 0),
-        ("context", 1),
-        ("context_ambiguous", 0),
+        ("context", 2),
         ("context_ambiguous", 1),
         ("general", 0),
         ("general", 1),
+        ("general", 2),
     ]
     targets = _target_counts(df, buckets)
     log.debug(f"[augment] Synthetic targets per bucket: {dict(targets)}")
@@ -293,15 +297,15 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
                 }
             )
 
-    cat_lbl = ("concatenation", 1)
+    cat_lbl = ("concatenation", 2)
     n = targets.get(cat_lbl, 0)
     log.info(f"[augment] synthetic_concat: generating {n} rows")
     sample = random.choices(toxic_df.to_dict("records"), k=n)
     for rec in sample:
         text = aug_full_concat(rec["text"])
-        add_row(text, 1, rec["lang"], "synthetic_concat", "concatenation")
+        add_row(text, 2, rec["lang"], "synthetic_concat", "concatenation")
 
-    n_toxic = targets.get(("concatenation", 1), 0)
+    n_toxic = targets.get(("concatenation", 2), 0)
     n_clean = targets.get(("concatenation", 0), 0)
     log.info(
         f"[augment] synthetic_partial_concat: {n_toxic} toxic, {n_clean} clean"
@@ -319,7 +323,7 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
             text, 0, rec["lang"], "synthetic_partial_concat", "concatenation"
         )
 
-    cat_lbl = ("context", 1)
+    cat_lbl = ("context", 2)
     n = targets.get(cat_lbl, 0)
     log.info(f"[augment] synthetic_context_filler: generating {n} rows")
     for rec in random.choices(toxic_df.to_dict("records"), k=n):
@@ -328,10 +332,10 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
             filler_pool=filler_pool,
             n_fillers=random.randint(1, 2),
         )
-        add_row(text, 1, rec["lang"], "synthetic_context_filler", "context")
+        add_row(text, 2, rec["lang"], "synthetic_context_filler", "context")
 
     n_mix = targets.get(("context", 0), 0) + targets.get(
-        ("context_ambiguous", 0), 0
+        ("context_ambiguous", 1), 0
     )
     log.info(f"[augment] synthetic_context_mix: generating ~{n_mix} rows")
     toxic_recs = random.choices(toxic_df.to_dict("records"), k=n_mix)
@@ -342,7 +346,7 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
         )
         add_row(text, label, t_rec["lang"], "synthetic_context_mix", category)
 
-    n = targets.get(("concatenation", 1), 0) // 2  # share budget with concat
+    n = targets.get(("concatenation", 2), 0) // 2
     log.info(f"[augment] synthetic_crosslang: generating {n} rows")
     for rec in random.choices(toxic_df.to_dict("records"), k=n):
         cross_text = aug_crosslang_concat(
@@ -350,7 +354,7 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
         )
         if cross_text:
             add_row(
-                cross_text, 1, "mixed", "synthetic_crosslang", "concatenation"
+                cross_text, 2, "mixed", "synthetic_crosslang", "concatenation"
             )
 
     synth_df = pd.DataFrame(rows)
@@ -369,8 +373,11 @@ def build_augmented_dataset(df: pd.DataFrame) -> pd.DataFrame:
 def augment_and_combine(real_df: pd.DataFrame) -> pd.DataFrame:
     real_df = real_df.copy()
     real_df["label"] = (
-        pd.to_numeric(real_df["label"], errors="coerce").fillna(0.0) >= 0.5
-    ).astype("int8")
+        pd.to_numeric(real_df["label"], errors="coerce")
+        .fillna(0.0)
+        .clip(0, 2)
+        .astype("int8")
+    )
 
     synth_df = build_augmented_dataset(real_df)
 
@@ -379,8 +386,11 @@ def augment_and_combine(real_df: pd.DataFrame) -> pd.DataFrame:
     combined = combined[combined["text"].str.len().between(3, 512)]
     combined = combined.dropna(subset=["text", "label"])
     combined["label"] = (
-        pd.to_numeric(combined["label"], errors="coerce").fillna(0.0) >= 0.5
-    ).astype("int8")
+        pd.to_numeric(combined["label"], errors="coerce")
+        .fillna(0.0)
+        .clip(0, 2)
+        .astype("int8")
+    )
 
     combined["_key"] = combined["text"].str.lower()
     combined = combined.drop_duplicates(subset="_key").drop(columns="_key")

@@ -15,13 +15,13 @@ async def moderate(
     _context: grpc.aio.ServicerContext[Any, Any],
 ) -> moderation_pb2.ModerateObjectResponse:
     try:
-        is_toxic = await service.moderate(request.text)
+        toxicity_level = await service.moderate(request.text)
     except Exception as exc:
         log.error(f"Moderation request failed: {exc}")
         raise
 
-    response = moderation_pb2.ModerateObjectResponse(success=is_toxic)
+    response = moderation_pb2.ModerateObjectResponse(level=toxicity_level)
     log.debug(
-        f"Responding ModerateObject id={request.id} success={response.success}"
+        f"Responding ModerateObject id={request.id} toxicity_level={response.level}"
     )
     return response

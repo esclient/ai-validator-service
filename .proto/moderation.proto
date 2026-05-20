@@ -13,7 +13,7 @@ message ModerateObjectRequest {
 }
 
 message ModerateObjectResponse {
-  bool success = 1;
+  ToxicityLevel level = 1;
 }
 
 enum ObjectType {
@@ -21,4 +21,11 @@ enum ObjectType {
   OBJECT_TYPE_MOD_DESCRIPTION = 1;
   OBJECT_TYPE_COMMENT_TEXT = 2;
   OBJECT_TYPE_USER_NAME = 3;
+}
+
+enum ToxicityLevel {
+  TOXICITY_LEVEL_UNSPECIFIED = 0;
+  TOXICITY_LEVEL_NONE = 1;
+  TOXICITY_LEVEL_MODERATE = 2;
+  TOXICITY_LEVEL_SEVERE = 3;
 }

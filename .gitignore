@@ -223,3 +223,4 @@ models/*
 
 *.proto
 .proto/*
+moderation.proto

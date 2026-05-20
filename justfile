@@ -4,7 +4,7 @@ set dotenv-load := true
 COMMON_JUST_URL := 'https://raw.githubusercontent.com/esclient/tools/refs/heads/main/python/common.just'
 LOAD_ENVS_URL := 'https://raw.githubusercontent.com/esclient/tools/refs/heads/main/load_envs.sh'
 
-AIVALIDATOR_PROTO_TAG := 'v0.1.3'
+AIVALIDATOR_PROTO_TAG := 'v0.1.4'
 AIVALIDATOR_PROTO_NAME := 'moderation.proto'
 AIVALIDATOR_TMP_DIR := '.proto'
 SOURCE := 'aivalidatorservice'

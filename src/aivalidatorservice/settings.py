@@ -11,7 +11,6 @@ class Settings(BaseSettings):
 
     host: str = Field(validation_alias="HOST")
     port: int = Field(validation_alias="PORT")
-    database_url: str = Field(validation_alias="DATABASE_URL")
 
     log_level: str = Field(validation_alias="LOG_LEVEL")
     log_format: str = Field(validation_alias="LOG_FORMAT")
