@@ -1,5 +1,6 @@
 import asyncio
 
+from aivalidatorservice.grpc import moderation_pb2
 from aivalidatorservice.logger.custom_logger import get_logger
 from aivalidatorservice.model.loader import ModerationModel
 from aivalidatorservice.service.moderate import moderate as _moderate
@@ -11,7 +12,9 @@ class ModerationService:
     def __init__(self, model: ModerationModel):
         self._model = model
 
-    async def moderate(self, normalized_text: str) -> bool:
+    async def moderate(
+        self, normalized_text: str
+    ) -> moderation_pb2.ToxicityLevel:
         log.debug(f"Service moderating text length={len(normalized_text)}")
         result = await asyncio.to_thread(
             _moderate, self._model, normalized_text

@@ -38,6 +38,9 @@ def configure_logger(settings: "Settings") -> None:
     _configured_level = getattr(
         logging, settings.log_level.upper(), logging.INFO
     )
+    for _name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger):
+            logger.setLevel(_configured_level)
 
 
 def get_logger(name: str) -> logging.Logger:

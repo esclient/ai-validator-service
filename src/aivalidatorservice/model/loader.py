@@ -2,9 +2,11 @@ import torch
 from optimum.onnxruntime import ORTModelForSequenceClassification
 from transformers import AutoTokenizer
 
+from aivalidatorservice.grpc import moderation_pb2
 from aivalidatorservice.logger.custom_logger import get_logger
 
-TOXICITY_THRESHOLD = 0.75
+TOXICITY_THRESHOLD_MODERATE = 0.5
+TOXICITY_THRESHOLD_SEVERE = 0.85
 
 log = get_logger(__name__)
 __all__ = [
@@ -38,9 +40,15 @@ class ModerationModel:
         toxic_score = probabilities[0][1].item()
         return toxic_score
 
-    def predict(self, text: str) -> bool:
+    def predict(self, text: str) -> moderation_pb2.ToxicityLevel:
         score = self._run(text)
-        log.debug(
-            f"Prediction toxic_score={score:.4f} threshold={TOXICITY_THRESHOLD}"
-        )
-        return score > TOXICITY_THRESHOLD
+        log.debug(f"Prediction toxic_score={score:.4f}")
+        if score < TOXICITY_THRESHOLD_MODERATE:
+            log.debug("Text toxicity classified as non-toxic")
+            return moderation_pb2.TOXICITY_LEVEL_NONE
+        elif score < TOXICITY_THRESHOLD_SEVERE:
+            log.debug("Text toxicity classified as moderate")
+            return moderation_pb2.TOXICITY_LEVEL_MODERATE
+        else:
+            log.debug("Text toxicity classified as severe")
+            return moderation_pb2.TOXICITY_LEVEL_SEVERE
